@@ -194,6 +194,7 @@ cga_putc(int c)
 	}
 
 	// What is the purpose of this?
+	// flush the screen
 	if (crt_pos >= CRT_SIZE) {
 		int i;
 

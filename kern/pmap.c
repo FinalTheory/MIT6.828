@@ -274,8 +274,9 @@ mem_init_mp(void)
 	//             Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
 	//
-	// LAB 4: Your code here:
-
+	for (int i = 0; i < NCPU; i++) {
+        boot_map_region(kern_pgdir, KSTACKTOP - i * (KSTKSIZE + KSTKGAP) - KSTKSIZE, KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W);
+	}
 }
 
 // --------------------------------------------------------------
@@ -327,6 +328,7 @@ page_init(void)
 	pages[1].pp_link = NULL;
 	static_assert(IOPHYSMEM % PGSIZE == 0);
 	static_assert(EXTPHYSMEM % PGSIZE == 0);
+	static_assert(MPENTRY_PADDR % PGSIZE == 0);
 	// free used pages for IO region and kernel code
 	size_t used_lhs = IOPHYSMEM / PGSIZE;
 	size_t used_rhs = PADDR(boot_alloc(0)) / PGSIZE;
@@ -336,6 +338,10 @@ page_init(void)
 	}
 	// skip the hole in linked list
 	pages[used_rhs].pp_link = &pages[used_lhs - 1];
+	int page_mp = MPENTRY_PADDR / PGSIZE;
+	pages[page_mp].pp_ref = 1;
+	pages[page_mp].pp_link = NULL;
+	pages[page_mp + 1].pp_link = &pages[page_mp - 1];
 }
 
 //
@@ -609,8 +615,14 @@ mmio_map_region(physaddr_t pa, size_t size)
 	//
 	// Hint: The staff solution uses boot_map_region.
 	//
-	// Your code here:
-	panic("mmio_map_region not implemented");
+	size = ROUNDUP(size, PGSIZE);
+	// va and pa should be page-aligned
+	assert(pa % PGSIZE == 0);
+	if (size + base >= MMIOLIM) { panic("mmio_map_region exceeds limit."); }
+	boot_map_region(kern_pgdir, base, size, pa, PTE_PCD | PTE_PWT | PTE_W);
+	void *ret = (void*)base;
+	base += size;
+	return ret;
 }
 
 static uintptr_t user_mem_check_addr;

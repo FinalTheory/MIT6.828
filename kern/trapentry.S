@@ -71,6 +71,13 @@ TRAPHANDLER_NOEC(int_simderr, T_SIMDERR)
 // This is true even if the associated hardware-generated exception normally produces an error code.
 TRAPHANDLER_NOEC(int_syscall, T_SYSCALL)
 
+TRAPHANDLER_NOEC(int_timer, IRQ_OFFSET + IRQ_TIMER)
+TRAPHANDLER_NOEC(int_kbd, IRQ_OFFSET + IRQ_KBD)
+TRAPHANDLER_NOEC(int_serial, IRQ_OFFSET + IRQ_SERIAL)
+TRAPHANDLER_NOEC(int_spurious, IRQ_OFFSET + IRQ_SPURIOUS)
+TRAPHANDLER_NOEC(int_ide, IRQ_OFFSET + IRQ_IDE)
+TRAPHANDLER_NOEC(int_error, IRQ_OFFSET + IRQ_ERROR)
+
 /*
  * Lab 3: Your code here for _alltraps
  */

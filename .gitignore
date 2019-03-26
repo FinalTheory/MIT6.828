@@ -1,3 +1,5 @@
+/cmake-*
+/.idea/
 /obj
 /jos.in
 /jos.log

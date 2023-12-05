@@ -66,6 +66,11 @@ duppage(envid_t envid, unsigned pn)
 	// check page permission of current process
 	pde_t pde = uvpd[PDX(va)];
 	pte_t pte = uvpt[pn];
+
+    if (pte & PTE_SHARE) {
+        return sys_page_map(father, va, envid, va, pte & PTE_SYSCALL);
+    }
+
     int perm = 0;
     bool cow = false;
     if ((pde & (PTE_W | PTE_COW)) && (pte & (PTE_W | PTE_COW))) {

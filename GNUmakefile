@@ -131,7 +131,7 @@ USER_CFLAGS := $(CFLAGS) -DJOS_USER -gstabs
 # the variable's value has changed, this will update the vars file and
 # force a rebuild of the rule that depends on it.
 $(OBJDIR)/.vars.%: FORCE
-	$(V)echo "$($*)" | cmp -s $@ || echo "$($*)" > $@
+	$(V)echo "$($*)" | cmp -s $@ - || echo "$($*)" > $@
 .PRECIOUS: $(OBJDIR)/.vars.%
 .PHONY: FORCE
 

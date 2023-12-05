@@ -301,7 +301,23 @@ map_segment(envid_t child, uintptr_t va, size_t memsz,
 static int
 copy_shared_pages(envid_t child)
 {
-	// LAB 5: Your code here.
+    int r;
+    envid_t father = sys_getenvid();
+    for (int i = 0; i < NPDENTRIES; i++) {
+        if ((uvpd[i] & PTE_P) && (uvpd[i] & PTE_SHARE)) {
+            for (int j = 0; j < NPTENTRIES; j++) {
+                unsigned pn = (unsigned)i * NPTENTRIES + j;
+                uintptr_t va = pn * PGSIZE;
+                if (va >= UTOP) { goto end; }
+                if (va == UXSTACKTOP - PGSIZE) { continue; }
+                if ((uvpt[pn] & PTE_P) && (uvpt[pn] & PTE_U) && (uvpt[pn] & PTE_SHARE)) {
+                    r = sys_page_map(father, (void*) va, child, (void*) va, uvpt[pn] & PTE_SYSCALL);
+                    if (r) { panic("sys_page_map: %e\n", r); }
+                }
+            }
+        }
+    }
+end:
 	return 0;
 }
 

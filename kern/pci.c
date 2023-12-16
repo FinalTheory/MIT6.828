@@ -4,6 +4,7 @@
 #include <kern/pci.h>
 #include <kern/pcireg.h>
 #include <kern/e1000.h>
+#include <kern/e1000_hw.h>
 
 // Flag to do "lspci" at bootup
 static int pci_show_devs = 1;
@@ -31,6 +32,7 @@ struct pci_driver pci_attach_class[] = {
 // pci_attach_vendor matches the vendor ID and device ID of a PCI device. key1
 // and key2 should be the vendor ID and device ID respectively
 struct pci_driver pci_attach_vendor[] = {
+	{ 0x8086, E1000_DEV_ID_82540EM, e1000_attach },
 	{ 0, 0, 0 },
 };
 

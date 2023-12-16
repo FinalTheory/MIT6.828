@@ -7,3 +7,5 @@ add_library(jos STATIC ${XV6_SRC})
 add_definitions(-DJOS_KERNEL)
 
 include_directories(.)
+include_directories(net/lwip/include)
+include_directories(net/lwip/jos)

@@ -64,6 +64,12 @@ hexdump(const char *prefix, const void *data, int len)
 	}
 }
 
+void dog() {
+    while (1) {
+        sys_yield();
+    }
+}
+
 void
 umain(int argc, char **argv)
 {
@@ -87,6 +93,15 @@ umain(int argc, char **argv)
 		input(ns_envid);
 		return;
 	}
+
+    // fork off a watch dog to keep qemu alive
+    envid_t dog_id = fork();
+    if (dog_id < 0)
+        panic("error forking");
+    else if (dog_id == 0) {
+        dog();
+        return;
+    }
 
 	cprintf("Sending ARP announcement...\n");
 	announce();

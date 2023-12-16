@@ -1,6 +1,7 @@
 #include <inc/mmu.h>
 #include <inc/x86.h>
 #include <inc/assert.h>
+#include <inc/string.h>
 
 #include <kern/pmap.h>
 #include <kern/trap.h>
@@ -31,6 +32,7 @@ struct Pseudodesc idt_pd = {
 	sizeof(idt) - 1, (uint32_t) idt
 };
 
+struct DriverHandler handlers[16];
 
 static const char *trapname(int trapno)
 {
@@ -92,6 +94,7 @@ void int_serial();
 void int_spurious();
 void int_ide();
 void int_error();
+void int_external();
 
 void
 trap_init(void)
@@ -130,6 +133,8 @@ trap_init(void)
     SETGATE(idt[IRQ_OFFSET + IRQ_SPURIOUS], 0, GD_KT, int_spurious, 0)
     SETGATE(idt[IRQ_OFFSET + IRQ_IDE], 0, GD_KT, int_ide, 0)
     SETGATE(idt[IRQ_OFFSET + IRQ_ERROR], 0, GD_KT, int_error, 0)
+
+    memset(handlers, 0, sizeof(handlers));
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -260,6 +265,8 @@ trap_dispatch(struct Trapframe *tf)
 		return;
 	}
 
+    uint16_t isr;
+
 	// Handle clock interrupts. Don't forget to acknowledge the
 	// interrupt using lapic_eoi() before calling the scheduler!
 	switch (tf->tf_trapno) {
@@ -268,6 +275,20 @@ trap_dispatch(struct Trapframe *tf)
             lapic_eoi();
             sched_yield();
             break;
+        case -1:
+            isr = pic_get_isr();
+            for (int i = 0; i < sizeof(handlers) / sizeof(handlers[0]); i++) {
+                if ((isr >> i) & 1) {
+                    if (handlers[i].handle) {
+                        handlers[i].handle();
+                    } else {
+                        cprintf("Undefined handler for external IRQ %d\n", i);
+                    }
+                }
+            }
+            irq_eoi();
+            lapic_eoi();
+            return;
         default:
             break;
 	}
@@ -434,3 +455,10 @@ page_fault_handler(struct Trapframe *tf)
 	env_destroy(curenv);
 }
 
+void install_driver_handler(int irq_line, struct DriverHandler handler) {
+    cprintf("Install interrupt handler for IRQ line %d\n", irq_line);
+    assert(irq_line >= 0 && irq_line < sizeof(handlers) / sizeof(handlers[0]));
+    handlers[irq_line] = handler;
+    SETGATE(idt[IRQ_OFFSET + irq_line], 0, GD_KT, int_external, 0)
+    irq_setmask_8259A(irq_mask_8259A & ~(1<<irq_line));
+}

@@ -95,3 +95,26 @@ irq_eoi(void)
 	outb(IO_PIC1, 0x20);
 	outb(IO_PIC2, 0x20);
 }
+
+#define PIC_READ_IRR                0x0a
+#define PIC_READ_ISR                0x0b
+
+static uint16_t __pic_get_irq_reg(int ocw3)
+{
+    /* OCW3 to PIC CMD to get the register values.  PIC2 is chained, and
+     * represents IRQs 8-15.  PIC1 is IRQs 0-7, with 2 being the chain */
+    outb(IO_PIC1, ocw3);
+    outb(IO_PIC2, ocw3);
+    return (inb(IO_PIC2) << 8) | inb(IO_PIC1);
+}
+
+/* Returns the combined value of the cascaded PICs irq request register */
+uint16_t pic_get_irr(void)
+{
+    return __pic_get_irq_reg(PIC_READ_IRR);
+}
+
+uint16_t pic_get_isr(void)
+{
+    return __pic_get_irq_reg(PIC_READ_ISR);
+}

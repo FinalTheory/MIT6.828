@@ -3,6 +3,9 @@
 #include <kern/pmap.h>
 #include <inc/string.h>
 #include <inc/error.h>
+#include <kern/trap.h>
+#include <kern/sched.h>
+#include <kern/env.h>
 
 volatile uint32_t *e1000_base = NULL;
 
@@ -37,11 +40,15 @@ int e1000_send_packet(void *buffer, size_t size) {
     return size;
 }
 
+static envid_t input_env_id = -1;
 
 int e1000_recv_packet(void *buffer, size_t size) {
+    input_env_id = curenv->env_id;
     uint32_t read_pos = (e1000_base[REG_INDEX(E1000_RDT)] + 1) % E1000_RX_BUF_SIZE;
     if (!rx_desc_buffer[read_pos].status) {
-        return -E_BUF_EMPTY;
+        curenv->env_tf.tf_regs.reg_eax = -E_BUF_EMPTY;
+        curenv->env_status = ENV_NOT_RUNNABLE;
+        sched_yield();
     }
     rx_desc_buffer[read_pos].status = 0;
     int length = rx_desc_buffer[read_pos].length;
@@ -54,6 +61,18 @@ int e1000_recv_packet(void *buffer, size_t size) {
     return length;
 }
 
+void e1000_interrupt_handler() {
+    struct Env *env;
+    uint32_t icr = e1000_base[REG_INDEX(E1000_ICR)];
+    if ((icr & E1000_ICR_RXT0) && input_env_id != -1) {
+        if (envid2env(input_env_id, &env, 0) != 0) {
+            panic("Unable to find envid.");
+        }
+        if (env->env_status != ENV_RUNNING) {
+            env->env_status = ENV_RUNNABLE;
+        }
+    }
+}
 
 int e1000_attach(struct pci_func *pcif) {
     pci_func_enable(pcif);
@@ -68,6 +87,11 @@ int e1000_attach(struct pci_func *pcif) {
     cprintf("E1000 device status register=0x%08x\n", e1000_base[REG_INDEX(E1000_STATUS)]);
     cprintf("E1000 device MMIO address space size=0x%08x\n", pcif->reg_size[0]);
     cprintf("tx desc buffer base addr=0x%08x\n", PADDR(tx_desc_buffer));
+
+    // e1000_base[REG_INDEX(E1000_IMS)] = E1000_IMS_RXT0 | E1000_IMS_RXO | E1000_IMS_RXDMT0 | E1000_IMS_RXSEQ | E1000_IMS_LSC;
+    e1000_base[REG_INDEX(E1000_IMS)] = E1000_IMS_RXT0;
+
+
     // setup send packet
     e1000_base[REG_INDEX(E1000_TDBAH)] = 0;
     e1000_base[REG_INDEX(E1000_TDBAL)] = PADDR(tx_desc_buffer);
@@ -89,9 +113,8 @@ int e1000_attach(struct pci_func *pcif) {
     for (int i = 0; i < 128; i++) {
         e1000_base[REG_INDEX(E1000_MTA) + i] = 0;
     }
-    // do not enable any interrupts yet
-    // e1000_base[REG_INDEX(E1000_IMS)] = E1000_IMS_RXT0 | E1000_IMS_RXO | E1000_IMS_RXDMT0 | E1000_IMS_RXSEQ | E1000_IMS_LSC;
-    e1000_base[REG_INDEX(E1000_IMS)] = 0;
+    e1000_base[REG_INDEX(E1000_ITR)] = 0x28B;
+    e1000_base[REG_INDEX(E1000_RDTR)] = 0;
     e1000_base[REG_INDEX(E1000_RDBAH)] = 0;
     e1000_base[REG_INDEX(E1000_RDBAL)] = PADDR(rx_desc_buffer);
     e1000_base[REG_INDEX(E1000_RDLEN)] = sizeof(rx_desc_buffer);
@@ -104,6 +127,10 @@ int e1000_attach(struct pci_func *pcif) {
     // RCTL.BSEX = 0b
     // RCTL.BSIZE = 00b => 2048 Bytes
     e1000_base[REG_INDEX(E1000_RCTL)] = E1000_RCTL_EN | E1000_RCTL_SECRC;
+
+    // interrupt handler
+    struct DriverHandler handler = {e1000_interrupt_handler};
+    install_driver_handler(pcif->irq_line, handler);
     return 1;
 }
 

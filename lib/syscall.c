@@ -128,5 +128,9 @@ int sys_packet_try_send(void *buffer, size_t size) {
 }
 
 int sys_packet_recv(void *buffer, size_t size) {
-    return syscall(SYS_packet_recv, 0, (uint32_t)buffer, size, 0, 0, 0);
+    int ret;
+    do {
+        ret = syscall(SYS_packet_recv, 0, (uint32_t)buffer, size, 0, 0, 0);
+    } while (ret == -E_BUF_EMPTY);
+    return ret;
 }

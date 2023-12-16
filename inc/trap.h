@@ -86,6 +86,10 @@ struct UTrapframe {
 	uintptr_t utf_esp;
 } __attribute__((packed));
 
+struct DriverHandler {
+    void (*handle)();
+};
+
 #endif /* !__ASSEMBLER__ */
 
 #endif /* !JOS_INC_TRAP_H */
